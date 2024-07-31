@@ -1,0 +1,355 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug</title>
+    <style>
+		.column {
+			height: 240px;
+			width: 180px;
+			overflow-y: auto;
+			float:left;
+			border-color:brown;
+			border:thin black solid;
+		}
+
+		.userBtn {
+			margin:10px 5px 5px 10px;
+			padding: 5px 5px 5px 5px;
+			min-width:160px;
+			display:block;
+			align-content:center;
+		}
+
+		.userBtn2 {
+			margin:10px 5px 5px 10px;
+			padding: 5px 5px 5px 5px;
+			min-width:120px;
+			align-content:center;
+		}
+
+		input{
+			width:90px;
+			padding:4px;
+		}
+
+		.key {
+			margin:2px;
+			padding:4px;
+			background-color:cadetblue;
+		}
+
+		span.value{
+			padding:4px;
+			background-color:gray;
+		}
+    </style>
+</head>
+ 
+<body>
+	<p>接口发送地址</p>
+	<textarea id="address">++ADDRESSHERE++</textarea>
+	<p>栏目列表</p>
+	<div id="columnBar">
+
+	</div>
+	<p style="clear:both"></p>
+
+	<hr />
+	<p>内容列表</p>
+	<label>
+		自动点播第一条内容
+		<input type="checkbox" id="auto_send" value="" />
+	</label>
+	<div id="contentBar">
+
+	</div>
+	<hr />
+	<p>开放API接口</p>
+
+	<div id="apiList">
+
+	</div>
+	<p>数据返回</p>
+	<textarea id="ResponseTxt" style="width:100%;min-height:200px"></textarea>
+	<p>接口数据</p>
+	<div>
+		<p id="apiInfoText"></p>
+	</div>
+
+	<script type="text/javascript">
+		var json;
+		var apiJson;
+		var addressNode = document.getElementById("address");
+
+		startAnalyze();
+
+		function startAnalyze() {
+			//请求接口数据
+			const Http = new XMLHttpRequest();
+			var url = "http://" + addressNode.innerHTML + "/?act=unity&states=json&object=";
+			console.log(url);
+			Http.open("Get", url);
+			Http.send();
+
+			Http.onreadystatechange = function () {
+				if (this.readyState == 4 && this.status == 200) {
+					document.getElementById("apiInfoText").innerText = Http.responseText;
+					json = JSON.parse(Http.responseText);
+					init();
+				}
+			}
+
+			//请求API接口
+			const Http2 = new XMLHttpRequest();
+			var url = "http://" + addressNode.innerHTML + "/?get=apiList";
+			console.log(url);
+			Http2.open("Get", url);
+			Http2.send();
+
+			Http2.onreadystatechange = function () {
+				if (this.readyState == 4 && this.status == 200) {
+					apiJson = JSON.parse(Http2.responseText);
+					createApiList();
+				}
+			}
+		}
+
+		function init() {
+			renderColumn(json.RootNode, true);
+		}
+
+		var maxDepth = 0;
+		function getOrCreateColumn(depth) {
+			var columnBar = document.getElementById("columnBar");
+			maxDepth = Math.max(depth, maxDepth);
+
+			var column = document.getElementById("c" + depth);
+			if (column == null) {
+				var newColumn = document.createElement("div");
+				newColumn.setAttribute("class", "column");
+				newColumn.setAttribute("id", "c" + depth);
+				columnBar.appendChild(newColumn);
+				return newColumn;
+			} else {
+				return column;
+			}
+		}
+
+		function renderColumn(tag, renderSelf = false) {
+			var count = 0;
+			var depth;
+			for (var i = 0; i < json.subColumns.length; i++) {
+				var obj = json.subColumns[i];
+				//渲染自己
+				if (obj["Tag"] == tag || obj["ParentTag"] == tag) {
+					depth = obj["Depth"];
+					if (renderSelf == false && obj["Tag"] == tag) continue;
+					var parent = getOrCreateColumn(depth);
+					if (renderSelf == false && count == 0) { parent.innerHTML = "" }//清空
+					var btn = document.createElement("button");
+					btn.setAttribute("onclick", "renderColumn(" + obj["Tag"] + ")");
+					btn.setAttribute("class", "userBtn");
+					btn.innerText = obj["Name"]+"("+obj["Tag"]+")";
+					parent.appendChild(btn);
+					count++;
+				}
+			}
+			//清除多余的栏目
+			for (var i = depth + 1; i <= maxDepth; i++) {
+				var c = document.getElementById("c" + i);
+				if (c != null) {
+					c.parentElement.removeChild(c);
+				}
+			}
+
+			renderContentList(tag);
+
+			sendColumnCommand(tag);
+		}
+
+		function renderContentList(tag) {
+			var contentNode = document.getElementById("contentBar");
+			contentNode.innerHTML = "";
+			var firstID = -1;
+			for (var i = 0; i < json.list.length; i++) {
+				var obj = json.list[i];
+				if (obj["tag"] == tag) {
+					if (firstID == -1) firstID = obj["ID"];
+					var btn = document.createElement("button");
+					btn.setAttribute("onclick", "sendPlayCommand(" + obj["ID"] + ")");
+					btn.setAttribute("class", "userBtn");
+					btn.innerText = obj["title"]+"("+obj["index"]+","+obj["ID"]+")";
+					contentNode.appendChild(btn);
+				}
+			}
+
+			//var checkbox = document.getElementById("auto_send");
+
+			var checked = document.getElementById("auto_send").checked;
+			if (checked && firstID != -1) {
+				sendPlayCommand(firstID);
+			}
+		}
+
+		function sendColumnCommand(id) {
+			var req = new XMLHttpRequest();
+			const url = "http://" + addressNode.innerHTML + "/?act=unity&object=" + id + "&states=channel";
+			req.open("Get", url);
+			req.send();
+		}
+
+		function sendPlayCommand(id) {
+			var req = new XMLHttpRequest();
+			const url = "http://" + addressNode.innerHTML + "/?act=unity&object=" + id + "&states=content";
+			req.open("Get", url);
+			req.send();
+		}
+
+		function sendCommand(id) {
+			var nodes = document.getElementById("api" + id).parentNode.childNodes;
+			var keyArr = [];
+			var valueArr = [];
+
+			for (var i = 0; i < nodes.length; i++) {
+				if (nodes[i].className.indexOf("key") != -1) {
+					keyArr.push(nodes[i].innerText);
+				} else if (nodes[i].className.indexOf("value") != -1) {
+					if (nodes[i].nodeName == "INPUT") {
+						valueArr.push(nodes[i].value);
+					}
+					else if (nodes[i].nodeName == "SPAN") {
+						valueArr.push(nodes[i].innerText);
+					}
+				}
+			}
+			var arg = "";
+			for (var i = 0; i < keyArr.length; i++) {
+				arg += ((i == 0 ? "?" : "&") + keyArr[i] + "=" + valueArr[i]);
+			}
+
+			var req = new XMLHttpRequest();
+			const url = "http://" + addressNode.innerHTML + "/" + arg;
+			console.log(url);
+			req.open("Get", url);
+			req.send();
+		}
+
+		function sendCommandResponse(id) {
+			var nodes = document.getElementById("apiR" + id).parentNode.childNodes;
+			var keyArr = [];
+			var valueArr = [];
+
+			for (var i = 0; i < nodes.length; i++) {
+				if (nodes[i].className.indexOf("key") != -1) {
+					keyArr.push(nodes[i].innerText);
+				} else if (nodes[i].className.indexOf("value") != -1) {
+					if (nodes[i].nodeName == "INPUT") {
+						valueArr.push(nodes[i].value);
+					}
+					else if (nodes[i].nodeName == "SPAN") {
+						valueArr.push(nodes[i].innerText);
+					}
+				}
+			}
+			var arg = "";
+			for (var i = 0; i < keyArr.length; i++) {
+				arg += ((i == 0 ? "?" : "&") + keyArr[i] + "=" + valueArr[i]);
+			}
+
+			var req = new XMLHttpRequest();
+			const url = "http://" + addressNode.innerHTML + "/" + arg;
+			console.log(url);
+			req.open("Get", url);
+			req.send();
+
+			req.onreadystatechange = function () {
+				if (this.readyState == 4 && this.status == 200) {
+					document.getElementById("ResponseTxt").innerText = req.responseText;
+				}
+			}
+		}
+
+		function createApiList() {
+			var apiParent = document.getElementById("apiList");
+			var callList = apiJson.callCommand;
+			for (var i = 0; i < callList.length; i++) {
+				var api = callList[i];
+				var div = document.createElement("div");
+				var btn = document.createElement("button");
+				btn.innerText = api.CommandName;
+				btn.setAttribute("class", "userBtn2");
+				btn.setAttribute("id", "api" + i);
+				btn.setAttribute("onclick", "sendCommand(" + i + ")");
+				div.appendChild(btn);
+				var requiredKeys = api.requiredKeys;
+				for (var j = 0; j < requiredKeys.length; j++) {
+					if (requiredKeys[j] == "") continue;
+					var span = document.createElement("span");
+					span.setAttribute("class", "key");
+					span.innerText = requiredKeys[j];
+					var span2 = document.createElement("span");
+					span2.innerText = api.requiredValues[j];
+					span2.setAttribute("class", "value");
+					div.appendChild(span);
+					div.appendChild(span2);
+				}
+
+				var variableKeys = api.variableKeys;
+				for (var k = 0; k < variableKeys.length; k++) {
+					if (variableKeys[k] == "") continue;
+					var span = document.createElement("span");
+					span.innerText = variableKeys[k];
+					span.setAttribute("class", "key");
+					var input = document.createElement("input");
+					input.setAttribute("type", "text");
+					input.setAttribute("class", "value");
+					div.append(span);
+					div.append(input);
+				}
+				apiParent.appendChild(div);
+			}
+			var responseList = apiJson.responseCommand;
+			for (var i = 0; i < responseList.length; i++) {
+				var api = responseList[i];
+				var div = document.createElement("div");
+				var btn = document.createElement("button");
+				btn.innerText = api.CommandName;
+				btn.setAttribute("class", "userBtn2");
+				btn.setAttribute("id", "apiR" + i);
+				btn.setAttribute("onclick", "sendCommandResponse(" + i + ")");
+				div.appendChild(btn);
+				var requiredKeys = api.requiredKeys;
+				for (var j = 0; j < requiredKeys.length; j++) {
+					if (requiredKeys[j] == "") continue;
+					var span = document.createElement("span");
+					span.setAttribute("class", "key");
+					span.innerText = requiredKeys[j];
+					var span2 = document.createElement("span");
+					span2.innerText = api.requiredValues[j];
+					span2.setAttribute("class", "value");
+					div.appendChild(span);
+					div.appendChild(span2);
+				}
+
+				var variableKeys = api.variableKeys;
+				for (var k = 0; k < variableKeys.length; k++) {
+					if (variableKeys[k] == "") continue;
+					var span = document.createElement("span");
+					span.innerText = variableKeys[k];
+					span.setAttribute("class", "key");
+					var input = document.createElement("input");
+					input.setAttribute("type", "text");
+					input.setAttribute("class", "value");
+					div.append(span);
+					div.append(input);
+				}
+				apiParent.appendChild(div);
+			}
+
+
+		}
+
+	</script>
+</body>
+</html>

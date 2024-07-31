@@ -1,0 +1,151 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CommandDebug</title>
+    <style>
+		.column {
+			height: 380px;
+			width: 220px;
+			overflow-y: auto;
+			float:left;
+			border-color:brown;
+			border:thin black solid;
+		}
+
+		.userBtn {
+			margin:10px 5px 5px 10px;
+			padding: 5px 5px 5px 5px;
+			min-width:200px;
+			display:block;
+			align-content:center;
+		}
+
+		.userBtn2 {
+			margin:10px 5px 5px 10px;
+			padding: 5px 5px 5px 5px;
+			min-width:120px;
+			align-content:center;
+		}
+
+		input{
+			width:90px;
+			padding:4px;
+		}
+
+		.key {
+			margin:2px;
+			padding:4px;
+			background-color:cadetblue;
+		}
+
+		span.value{
+			padding:4px;
+			background-color:gray;
+		}
+    </style>
+</head>
+ 
+<body>
+	<p>指令发送地址</p>
+	<textarea id="address">++ADDRESSHERE++</textarea>
+	<p>指令列表</p>
+	<div id="columnBar">
+	</div>
+	<p style="clear:both"></p>
+	<hr />
+	<p>接口数据</p>
+	<div>
+		<p id="apiInfoText"></p>
+	</div>
+
+	<script type="text/javascript">
+		var json;
+		var apiJson;
+		var addressNode = document.getElementById("address");
+
+		startAnalyze();
+
+		function startAnalyze() {
+			//请求接口数据
+			const Http = new XMLHttpRequest();
+			var url = "http://" + addressNode.innerHTML + "/?act=getCommandList";
+			console.log(url);
+			Http.open("Get", url);
+			Http.send();
+
+			Http.onreadystatechange = function () {
+				if (this.readyState == 4 && this.status == 200) {
+					document.getElementById("apiInfoText").innerText = Http.responseText;
+					json = JSON.parse(Http.responseText);
+					init();
+				}
+			}
+		}
+
+		function init() {
+			renderColumn(1000);
+		}
+
+		var maxDepth = 0;
+		function getOrCreateColumn(depth) {
+			var columnBar = document.getElementById("columnBar");
+			maxDepth = Math.max(depth, maxDepth);
+
+			var column = document.getElementById("c" + depth);
+			if (column == null) {
+				var newColumn = document.createElement("div");
+				newColumn.setAttribute("class", "column");
+				newColumn.setAttribute("id", "c" + depth);
+				columnBar.appendChild(newColumn);
+				return newColumn;
+			} else {
+				return column;
+			}
+		}
+
+		function renderColumn(tag, renderSelf = false) {
+			var count = 0;
+			var depth;
+			for (var i = 0; i < json.commands.length; i++) {
+				var obj = json.commands[i];
+				//渲染自己
+				if (obj["ID"] == tag || obj["ParentID"] == tag) 
+				{
+					depth = obj["Depth"];
+					if (renderSelf == false && obj["ID"] == tag) continue;
+					var parent = getOrCreateColumn(depth);
+					if (renderSelf == false && count == 0) { parent.innerHTML = "" }//清空
+					var btn = document.createElement("button");
+					btn.setAttribute("onclick", "renderColumn(" + obj["ID"] + ")");
+					btn.setAttribute("class", "userBtn");
+					btn.innerText = obj["Name"]+"("+obj["ID"]+")";
+					parent.appendChild(btn);
+					count++;
+				}
+			}
+			//清除多余的栏目
+			for (var i = depth + 1; i <= maxDepth; i++) {
+				var c = document.getElementById("c" + i);
+				if (c != null) {
+					c.parentElement.removeChild(c);
+				}
+			}
+
+			sendCommand(tag);
+		}
+
+
+		function sendCommand(id) {
+			var req = new XMLHttpRequest();
+			const url = "http://" + addressNode.innerHTML + "/?act=unity&object=ExecuteCommandByID" + "&states="+id;
+			console.log(url);
+			req.open("Get", url);
+			req.send();
+		}
+
+
+
+	</script>
+</body>
+</html>

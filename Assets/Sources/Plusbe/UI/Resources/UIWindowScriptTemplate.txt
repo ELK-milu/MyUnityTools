@@ -1,0 +1,54 @@
+using UnityEngine;
+using System.Collections;
+using UnityEngine.UI;
+using TMPro;
+public class #class_name# : UIWindowBase 
+{   
+    #ui#
+    public override void OnInit()//在创建时只调用一次
+    {
+
+    }
+    //UI的初始化请放在这里
+    public override void OnOpen()//在创建时只调用一次
+    {
+        FindUI();
+        AddListener();
+        RegisterUIEvent();
+    }
+    void FindUI()//寻找UI
+    {
+        #uifind#
+    }
+    void RegisterUIEvent()//注册UI事件
+    {
+           
+    }
+    void AddListener()
+    {
+
+    }
+    void OnRemoveListener()//移除事件
+    {
+       
+    }
+    public override void OnShow()//启用时
+    {
+    }
+
+    public override void OnHide()//关闭时
+    {
+
+    }
+    public override void OnRefresh()
+    {
+
+    }
+
+    public override void OnUIDestroy()
+    {
+        OnRemoveListener();
+        base.OnUIDestroy();
+    }
+
+}

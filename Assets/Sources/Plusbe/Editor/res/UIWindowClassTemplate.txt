@@ -1,0 +1,12 @@
+﻿using UnityEngine;
+using System.Collections;
+
+public class {0} : UIWindowBase 
+{
+	
+    //UI打开的初始化请放在这里
+    public override void OnOpen()
+    {
+
+    }
+}
